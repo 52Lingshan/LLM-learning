@@ -1,0 +1,9 @@
+# Obsidian internals
+.obsidian/
+.trash/
+
+# Excluded content
+碎片知识/
+代码架构分析/AReaL-Architecture.md
+代码架构分析/AReaL-Asystem-Integration.md
+代码架构分析/Asystem-HybridEngine-Architecture.md

@@ -1,0 +1,1 @@
+https://github.com/kvcache-ai/ktransformers/blob/main/kt-kernel/scripts/convert_moe_to_bf16.py
