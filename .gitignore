@@ -1,6 +1,7 @@
 # Obsidian internals
 .obsidian/
 .trash/
+.DS_Store
 
 # Excluded content
 碎片知识/
