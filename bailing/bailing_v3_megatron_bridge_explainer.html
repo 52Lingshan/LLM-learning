@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bailing V3 Tiny vs Flash 与 Megatron-Bridge 适配讲解</title>
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --paper: #fffdf7;
+      --ink: #171717;
+      --muted: #68635b;
+      --line: #ddd5c8;
+      --blue: #1548ff;
+      --green: #008f5a;
+      --orange: #ff7a1a;
+      --red: #c9362b;
+      --violet: #6247aa;
+      --shadow: 0 18px 45px rgba(30, 24, 14, 0.11);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+      --serif: Georgia, "Times New Roman", "Noto Serif SC", serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 12%, rgba(21, 72, 255, 0.08), transparent 28rem),
+        radial-gradient(circle at 82% 4%, rgba(255, 122, 26, 0.12), transparent 22rem),
+        linear-gradient(135deg, #f8f6f0 0%, #eee8dc 100%);
+      font-family: var(--sans);
+      line-height: 1.65;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .side {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 20px;
+      border-right: 1px solid var(--line);
+      background: rgba(255, 253, 247, 0.82);
+      backdrop-filter: blur(18px);
+      overflow-y: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--ink);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-weight: 800;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .nav-title {
+      margin: 24px 0 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .nav a {
+      display: block;
+      padding: 9px 10px;
+      border-radius: 8px;
+      color: #37332d;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .nav a:hover {
+      color: var(--blue);
+      background: rgba(21, 72, 255, 0.07);
+    }
+
+    .main {
+      max-width: 1220px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 42px 42px 80px;
+    }
+
+    .hero {
+      min-height: 86vh;
+      display: grid;
+      align-content: center;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      width: fit-content;
+      margin-bottom: 22px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 42px;
+      height: 2px;
+      background: var(--blue);
+    }
+
+    h1 {
+      max-width: 980px;
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(44px, 7vw, 96px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 820px;
+      margin: 28px 0 0;
+      color: #3f3a33;
+      font-size: clamp(18px, 2vw, 24px);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 44px;
+    }
+
+    .metric {
+      min-height: 136px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 247, 0.72);
+      box-shadow: var(--shadow);
+    }
+
+    .metric .num {
+      display: block;
+      color: var(--blue);
+      font-family: var(--serif);
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    .metric .label {
+      display: block;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    section {
+      padding: 70px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-family: var(--serif);
+      font-size: clamp(32px, 4vw, 54px);
+      line-height: 1.05;
+    }
+
+    h3 {
+      margin: 30px 0 12px;
+      font-size: 22px;
+      line-height: 1.25;
+    }
+
+    .lead {
+      max-width: 880px;
+      margin: 0 0 28px;
+      color: #403a31;
+      font-size: 19px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 253, 247, 0.88);
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 4px 9px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .tag.blue { color: var(--blue); }
+    .tag.green { color: var(--green); }
+    .tag.orange { color: var(--orange); }
+    .tag.red { color: var(--red); }
+    .tag.violet { color: var(--violet); }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 620px;
+    }
+
+    th, td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    th {
+      color: #fff;
+      background: var(--ink);
+      font-family: var(--mono);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    td strong { color: var(--blue); }
+
+    .diagram {
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(rgba(23, 23, 23, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 23, 23, 0.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 22px 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .arch {
+      display: grid;
+      gap: 12px;
+    }
+
+    .layer-row {
+      display: grid;
+      grid-template-columns: 78px 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .layer-label {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .pill {
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: 800;
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .kda { background: var(--blue); }
+    .mla { background: var(--violet); }
+    .dense { background: var(--orange); }
+    .moe { background: var(--green); }
+    .mtp { background: var(--red); }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .flow .step {
+      position: relative;
+      min-height: 118px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 253, 247, 0.94);
+    }
+
+    .flow .step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: -16px;
+      top: 42%;
+      color: var(--blue);
+      font-size: 24px;
+      font-weight: 900;
+      z-index: 2;
+    }
+
+    .step b {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .step span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tabs {
+      margin-top: 24px;
+    }
+
+    .tab-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--ink);
+      background: var(--paper);
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover, button.active {
+      color: #fff;
+      border-color: var(--blue);
+      background: var(--blue);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    pre {
+      overflow-x: auto;
+      margin: 0;
+      padding: 18px;
+      border: 1px solid #2b2b2b;
+      border-radius: 8px;
+      color: #f3efe5;
+      background: #151515;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+      box-shadow: var(--shadow);
+    }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.95em;
+    }
+
+    :not(pre) > code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: rgba(21, 72, 255, 0.08);
+    }
+
+    .callout {
+      padding: 20px 22px;
+      border-left: 5px solid var(--blue);
+      border-radius: 8px;
+      background: rgba(255, 253, 247, 0.86);
+      box-shadow: var(--shadow);
+    }
+
+    .callout.warning { border-left-color: var(--orange); }
+    .callout.danger { border-left-color: var(--red); }
+    .callout.success { border-left-color: var(--green); }
+
+    .timeline {
+      position: relative;
+      display: grid;
+      gap: 18px;
+      margin-top: 26px;
+      padding-left: 24px;
+    }
+
+    .timeline::before {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      background: var(--line);
+    }
+
+    .event {
+      position: relative;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .event::before {
+      content: "";
+      position: absolute;
+      left: -23px;
+      top: 22px;
+      width: 12px;
+      height: 12px;
+      border: 3px solid var(--paper);
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 0 1px var(--line);
+    }
+
+    .event h3 { margin: 0 0 8px; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .legend .item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .footer-note {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; }
+      .side {
+        position: relative;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .main { padding: 28px 20px 60px; }
+      .hero-grid, .cards, .split, .flow {
+        grid-template-columns: 1fr;
+      }
+      .flow .step::after { display: none; }
+      .layer-row {
+        grid-template-columns: 64px 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <div class="brand">
+        <div class="mark">B3</div>
+        <div>
+          <strong>Bailing V3 Explainer</strong>
+          <span>Tiny vs Flash · Megatron-Bridge</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-title">阅读路径</div>
+        <a href="#overview">1. 一句话读懂</a>
+        <a href="#compare">2. Tiny vs Flash</a>
+        <a href="#architecture">3. 架构怎么运转</a>
+        <a href="#kernel">4. KDA kernel 差异</a>
+        <a href="#bridge">5. Megatron-Bridge 适配</a>
+        <a href="#debug">6. NaN 调试故事</a>
+        <a href="#checklist">7. 后续验证清单</a>
+        <a href="#glossary">8. 术语速查</a>
+      </nav>
+      <div class="nav-title">来源文件</div>
+      <div class="tag blue">bailing_v3_tiny_vs_flash.md</div>
+      <br /><br />
+      <div class="tag green">bailing_v3_megatron_bridge_adaptation.md</div>
+    </aside>
+
+    <main class="main">
+      <header class="hero" id="overview">
+        <div class="eyebrow">HTML explainer · optimized for one-pass reading</div>
+        <h1>Bailing V3 从模型对比到 Megatron-Bridge 适配</h1>
+        <p>
+          这份页面把 Tiny vs Flash 架构差异和 Megatron-Bridge 适配工作合并成一个讲解型界面。
+          重点不是罗列参数，而是回答三个问题：Flash 为什么更大更快？Bailing V3 的 MLA/KDA/MoE 如何排布？适配训练框架时为什么会出现 NaN，又该如何定位？
+        </p>
+        <div class="hero-grid">
+          <div class="metric">
+            <span class="num">15.5×</span>
+            <span class="label">Flash 相对 Tiny 的权重规模约放大倍数</span>
+          </div>
+          <div class="metric">
+            <span class="num">5:1</span>
+            <span class="label">Flash 每 6 层中 KDA:MLA 的比例</span>
+          </div>
+          <div class="metric">
+            <span class="num">512</span>
+            <span class="label">Flash routed experts 数量</span>
+          </div>
+          <div class="metric">
+            <span class="num">42+1</span>
+            <span class="label">Flash 主干层数 + MTP 层</span>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>先给结论</h2>
+        <p class="lead">
+          Bailing V3 Flash 不是 Tiny 的简单放大版。它在三个层面变了：模型规模显著变大，KDA 占比更高，KDA gate 计算从外置变成 kernel 内置融合。Megatron-Bridge 适配的核心工作，就是把这种混合架构准确映射到 MCore 的异构 attention、MoE、MTP 和权重转换体系里。
+        </p>
+        <div class="cards">
+          <div class="card">
+            <span class="tag blue">Model</span>
+            <h3>Flash 更大，也更偏向 KDA</h3>
+            <p>Flash 是 42 层、hidden size 2560、512 experts。层组从 Tiny 的 4 层一组变成 6 层一组，因此 KDA:MLA 从 3:1 提升到 5:1。</p>
+          </div>
+          <div class="card">
+            <span class="tag green">Kernel</span>
+            <h3>Flash 把 gate 融进 KDA kernel</h3>
+            <p>Tiny 先调用 <code>fused_kda_gate</code> 计算 gate，再把结果传给 KDA。Flash 传入 <code>A_log</code> 和 <code>dt_bias</code>，由 kernel 内部完成 gate。</p>
+          </div>
+          <div class="card">
+            <span class="tag orange">Bridge</span>
+            <h3>适配难点在权重映射</h3>
+            <p>NaN 的根因不是数据坏了，而是部分 expert 和 MLA Q LoRA 权重没有被正确加载。修复重点是补齐 SequentialMLP 和 Q LoRA 映射。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="compare">
+        <h2>Tiny vs Flash：不是只差参数量</h2>
+        <p class="lead">
+          Tiny 和 Flash 共享 Bailing V3 的大范式：MLA + KDA + MoE + MTP。但 Flash 的规模、层排布、专家数量和 kernel 调用路径都发生了关键变化。
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>参数</th>
+                <th>Tiny</th>
+                <th>Flash</th>
+                <th>讲解</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>权重文件大小</td>
+                <td>16.4 GB，约 15.3B</td>
+                <td><strong>255.0 GB，约 237B</strong></td>
+                <td>Flash 约为 Tiny 的 15.5 倍。</td>
+              </tr>
+              <tr>
+                <td>hidden_size</td>
+                <td>1536</td>
+                <td><strong>2560</strong></td>
+                <td>主干宽度更大，单层容量更强。</td>
+              </tr>
+              <tr>
+                <td>num_hidden_layers</td>
+                <td>24</td>
+                <td><strong>42</strong></td>
+                <td>Flash 更深，并额外有 1 层 MTP。</td>
+              </tr>
+              <tr>
+                <td>attention heads</td>
+                <td>16</td>
+                <td><strong>32</strong></td>
+                <td>Flash 的 head 数翻倍。</td>
+              </tr>
+              <tr>
+                <td>layer_group_size</td>
+                <td>4</td>
+                <td><strong>6</strong></td>
+                <td>Tiny 是 3 KDA + 1 MLA，Flash 是 5 KDA + 1 MLA。</td>
+              </tr>
+              <tr>
+                <td>first_k_dense_replace</td>
+                <td>1</td>
+                <td><strong>2</strong></td>
+                <td>Flash 前 2 层使用 Dense MLP，再进入 MoE。</td>
+              </tr>
+              <tr>
+                <td>num_experts</td>
+                <td>128</td>
+                <td><strong>512</strong></td>
+                <td>Flash routed experts 是 Tiny 的 4 倍。</td>
+              </tr>
+              <tr>
+                <td>num_experts_per_tok</td>
+                <td>8</td>
+                <td>8</td>
+                <td>每个 token 激活专家数保持一致。</td>
+              </tr>
+              <tr>
+                <td>q_lora_rank</td>
+                <td><strong>256</strong></td>
+                <td><strong>null</strong></td>
+                <td>Tiny 的 Q 使用低秩双投影，Flash 的 Q 是全量投影。</td>
+              </tr>
+              <tr>
+                <td>kv_lora_rank</td>
+                <td>512</td>
+                <td>512</td>
+                <td>KV 压缩路径保持一致。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout warning" style="margin-top: 22px;">
+          <strong>关键提醒：</strong>
+          Tiny vs Flash 文档中写到 Flash 的 <code>q_lora_rank=null</code>；Megatron-Bridge 适配摘要中又列出 Bailing V3 的 MLA 层有 <code>q_lora_rank=768</code>。
+          这可能对应不同配置快照或适配过程中使用的 Flash 权重版本。实际转换时必须以当前 checkpoint 的 <code>config.json</code> 为准。
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>Bailing V3 的混合架构怎么运转</h2>
+        <p class="lead">
+          Bailing V3 的主干不是单一 attention，而是交替使用 KDA 和 MLA。Flash 的典型排布是每 6 层一个周期：5 层 KDA，1 层 MLA。前 2 层 MLP 是 Dense，之后进入 MoE。
+        </p>
+
+        <div class="split">
+          <div class="diagram">
+            <h3 style="margin-top:0;">Flash 层类型分布</h3>
+            <div class="arch">
+              <div class="layer-row">
+                <div class="layer-label">0-1</div>
+                <div class="pill kda">KDA Attention</div>
+                <div class="pill dense">Dense MLP</div>
+              </div>
+              <div class="layer-row">
+                <div class="layer-label">2-4</div>
+                <div class="pill kda">KDA Attention</div>
+                <div class="pill moe">MoE</div>
+              </div>
+              <div class="layer-row">
+                <div class="layer-label">5</div>
+                <div class="pill mla">MLA Attention</div>
+                <div class="pill moe">MoE</div>
+              </div>
+              <div class="layer-row">
+                <div class="layer-label">6-10</div>
+                <div class="pill kda">KDA Attention</div>
+                <div class="pill moe">MoE</div>
+              </div>
+              <div class="layer-row">
+                <div class="layer-label">11</div>
+                <div class="pill mla">MLA Attention</div>
+                <div class="pill moe">MoE</div>
+              </div>
+              <div class="layer-row">
+                <div class="layer-label">...</div>
+                <div class="pill kda">每 6 层循环</div>
+                <div class="pill moe">MoE</div>
+              </div>
+              <div class="layer-row">
+                <div class="layer-label">41</div>
+                <div class="pill mla">MLA Attention</div>
+                <div class="pill moe">MoE</div>
+              </div>
+              <div class="layer-row">
+                <div class="layer-label">42</div>
+                <div class="pill mtp">MTP Layer</div>
+                <div class="pill moe">MLA + MoE</div>
+              </div>
+            </div>
+            <div class="legend">
+              <span class="item"><span class="dot kda"></span>KDA 线性注意力</span>
+              <span class="item"><span class="dot mla"></span>MLA softmax 注意力</span>
+              <span class="item"><span class="dot moe"></span>专家混合层</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <span class="tag violet">Mental Model</span>
+            <h3>为什么 KDA 占比高</h3>
+            <p>
+              KDA 是线性注意力路径，更适合吞吐和长序列效率；MLA 是 softmax 注意力路径，用来保留更强的精确注意力能力。
+              Flash 把比例调成 5:1，本质是更激进地把主干计算推向 KDA，再周期性插入 MLA 做能力补偿。
+            </p>
+            <h3>MoE 在哪里</h3>
+            <p>
+              除前 2 层 Dense MLP 外，后续层使用 MoE。Flash 有 512 个 routed experts，每个 token 选择 8 个专家，同时有 shared expert。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="kernel">
+        <h2>KDA kernel 差异：Flash 的名字从哪里来</h2>
+        <p class="lead">
+          Tiny 与 Flash 建模代码只有 42 行差异，核心集中在 <code>BailingMoeV3KimiDeltaAttention</code>。最重要的变化是 gate 计算从 Python 侧外置，变成 CUDA kernel 内置融合。
+        </p>
+
+        <div class="tabs" data-tabs>
+          <div class="tab-buttons">
+            <button class="active" data-tab="tiny-kda">Tiny 外置 gate</button>
+            <button data-tab="flash-kda">Flash 内置 gate</button>
+            <button data-tab="diff-kda">差异本质</button>
+          </div>
+
+          <div class="tab-panel active" id="tiny-kda">
+            <pre><code># Tiny 路径：先在外部计算 gate
+g = self.f_a_proj(hidden_states)
+g = fused_kda_gate(
+    g,
+    self.A_log.view(1, 1, -1, 1),
+    self.head_dim,
+    g_bias=self.dt_bias,
+)
+
+o, recurrent_state = chunk_kda(
+    q=q,
+    k=k,
+    v=v,
+    g=g,
+    beta=beta,
+    initial_state=recurrent_state,
+    output_final_state=True,
+    use_qk_l2norm_in_kernel=True,
+    safe_gate=self.safe_gate,
+    lower_bound=self.lower_bound,
+    cu_seqlens=cu_seqlens,
+)</code></pre>
+          </div>
+
+          <div class="tab-panel" id="flash-kda">
+            <pre><code># Flash 路径：把 gate 计算融合进 kernel
+g = self.f_proj(hidden_states)
+g = rearrange(g, "... (h d) -> ... h d", d=self.head_dim)
+
+o, recurrent_state = chunk_kda(
+    q=q,
+    k=k,
+    v=v,
+    g=g,
+    beta=beta,
+    initial_state=recurrent_state,
+    output_final_state=True,
+    use_qk_l2norm_in_kernel=True,
+    A_log=self.A_log,
+    dt_bias=self.dt_bias,
+    use_gate_in_kernel=True,
+    cu_seqlens=cu_seqlens,
+)</code></pre>
+          </div>
+
+          <div class="tab-panel" id="diff-kda">
+            <div class="flow">
+              <div class="step">
+                <b>Tiny</b>
+                <span>投影后先调用 fused_kda_gate。</span>
+              </div>
+              <div class="step">
+                <b>中间结果</b>
+                <span>gate 张量写回显存。</span>
+              </div>
+              <div class="step">
+                <b>再调用 KDA</b>
+                <span>chunk_kda 读取已经算好的 gate。</span>
+              </div>
+              <div class="step">
+                <b>Flash</b>
+                <span>传入 A_log 与 dt_bias。</span>
+              </div>
+              <div class="step">
+                <b>融合</b>
+                <span>kernel 内部完成 gate，减少 launch 和读写。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout success" style="margin-top: 22px;">
+          <strong>一句话：</strong>
+          Tiny 是“先算 gate，再做 KDA”；Flash 是“把 gate 计算塞进 KDA kernel 一起做”。这就是 Flash 更强调 fused kernel 优化的核心证据。
+        </div>
+      </section>
+
+      <section id="bridge">
+        <h2>Megatron-Bridge 适配：把 HF 模型翻译成 MCore 世界</h2>
+        <p class="lead">
+          适配工作可以看作一次“结构翻译”：HF 里的 BailingMoeV3ForCausalLM 要映射到 Megatron-LM / Megatron-Bridge 的 transformer config、模块 spec、权重命名和并行策略中。
+        </p>
+
+        <div class="flow">
+          <div class="step">
+            <b>1. Config</b>
+            <span>放宽 MLA + rotary_interleaved 限制，加入 kda variant。</span>
+          </div>
+          <div class="step">
+            <b>2. KDA Module</b>
+            <span>新增 KimiDeltaAttention，对齐 HF 的分离投影。</span>
+          </div>
+          <div class="step">
+            <b>3. Module Spec</b>
+            <span>让 MCore 能构造 MLA/KDA 混合层。</span>
+          </div>
+          <div class="step">
+            <b>4. Bridge</b>
+            <span>注册 BailingMoeV3，写参数映射。</span>
+          </div>
+          <div class="step">
+            <b>5. Recipe</b>
+            <span>补齐 pretrain 配方与训练参数。</span>
+          </div>
+        </div>
+
+        <h3>修改文件地图</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>区域</th>
+                <th>文件</th>
+                <th>作用</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Megatron-LM</td>
+                <td><code>transformer_config.py</code></td>
+                <td>允许 <code>experimental_attention_variant="kda"</code>，扩展相关验证。</td>
+              </tr>
+              <tr>
+                <td>Megatron-LM</td>
+                <td><code>multi_latent_attention.py</code></td>
+                <td>给 MLA 的 RotaryEmbedding 传递 <code>rotary_interleaved</code>。</td>
+              </tr>
+              <tr>
+                <td>Megatron-LM</td>
+                <td><code>megatron/core/ssm/kda.py</code></td>
+                <td>新增 <code>KimiDeltaAttention</code> 模块。</td>
+              </tr>
+              <tr>
+                <td>Megatron-LM</td>
+                <td><code>experimental_attention_variant_module_specs.py</code></td>
+                <td>注册 KDA module spec，并标记为 linear attention variant。</td>
+              </tr>
+              <tr>
+                <td>Megatron-Bridge</td>
+                <td><code>bailing_provider.py</code></td>
+                <td>定义 BailingMoeV3Provider 和完整默认配置。</td>
+              </tr>
+              <tr>
+                <td>Megatron-Bridge</td>
+                <td><code>bailing_bridge.py</code></td>
+                <td>注册 HF 模型，处理 MLA/KDA/MoE/MTP 权重映射。</td>
+              </tr>
+              <tr>
+                <td>Megatron-Bridge</td>
+                <td><code>bailing_v3.py</code></td>
+                <td>新增 pretrain 配方函数。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>KDA vs GDN：为什么不能直接复用</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>特性</th>
+                <th>GDN，Qwen3-Next</th>
+                <th>KDA，Bailing V3</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>输入投影</td>
+                <td>合并 <code>in_proj</code></td>
+                <td>分离 <code>q/k/v/f/g/b_proj</code></td>
+              </tr>
+              <tr>
+                <td>卷积</td>
+                <td>合并 <code>conv1d</code></td>
+                <td>分离 <code>q/k/v_conv1d</code></td>
+              </tr>
+              <tr>
+                <td>衰减计算</td>
+                <td><code>-A_log.exp() * softplus(alpha + dt_bias)</code></td>
+                <td>直接传 <code>A_log</code> 和 <code>dt_bias</code> 给 <code>chunk_kda</code></td>
+              </tr>
+              <tr>
+                <td>输出门控</td>
+                <td><code>RMSNorm(x) * silu(gate)</code></td>
+                <td><code>FusedRMSNormGated(o, g_proj_output)</code></td>
+              </tr>
+              <tr>
+                <td>核心 kernel</td>
+                <td><code>chunk_gated_delta_rule</code></td>
+                <td><code>chunk_kda</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tabs" data-tabs>
+          <div class="tab-buttons">
+            <button class="active" data-tab="mapping-mla">MLA 映射</button>
+            <button data-tab="mapping-kda">KDA 映射</button>
+            <button data-tab="mapping-moe">MoE 映射</button>
+            <button data-tab="mapping-mtp">MTP 映射</button>
+          </div>
+
+          <div class="tab-panel active" id="mapping-mla">
+            <pre><code>decoder.layers.*.self_attention.linear_q_down_proj.weight
+  -> model.layers.*.attention.q_a_proj.weight
+
+decoder.layers.*.self_attention.linear_q_up_proj.weight
+  -> model.layers.*.attention.q_b_proj.weight
+
+decoder.layers.*.self_attention.linear_q_up_proj.layer_norm_weight
+  -> model.layers.*.attention.q_a_layernorm.weight
+
+decoder.layers.*.self_attention.linear_kv_down_proj.weight
+  -> model.layers.*.attention.kv_a_proj_with_mqa.weight
+
+decoder.layers.*.self_attention.linear_kv_up_proj.weight
+  -> model.layers.*.attention.kv_b_proj.weight</code></pre>
+          </div>
+
+          <div class="tab-panel" id="mapping-kda">
+            <pre><code>decoder.layers.*.self_attention.linear_qkv.weight
+  -> QKV 合并映射
+
+decoder.layers.*.self_attention.f_proj.weight
+  -> model.layers.*.attention.f_proj.weight
+
+decoder.layers.*.self_attention.g_proj.weight
+  -> model.layers.*.attention.g_proj.weight
+
+decoder.layers.*.self_attention.b_proj.weight
+  -> model.layers.*.attention.b_proj.weight
+
+decoder.layers.*.self_attention.A_log
+  -> model.layers.*.attention.A_log
+
+decoder.layers.*.self_attention.dt_bias
+  -> model.layers.*.attention.dt_bias</code></pre>
+          </div>
+
+          <div class="tab-panel" id="mapping-moe">
+            <pre><code>decoder.layers.*.mlp.router.weight
+  -> model.layers.*.mlp.gate.weight
+
+decoder.layers.*.mlp.router.expert_bias
+  -> model.layers.*.mlp.gate.expert_bias
+
+decoder.layers.*.mlp.experts.local_experts.*.linear_fc1.weight
+  -> gate_proj + up_proj
+
+decoder.layers.*.mlp.experts.local_experts.*.linear_fc2.weight
+  -> down_proj.weight</code></pre>
+          </div>
+
+          <div class="tab-panel" id="mapping-mtp">
+            <pre><code>mtp.layers.0.eh_proj.weight
+  -> model.layers.42.eh_proj.weight
+
+mtp.layers.0.enorm.weight
+  -> model.layers.42.enorm.weight
+
+mtp.layers.0.hnorm.weight
+  -> model.layers.42.hnorm.weight
+
+mtp.layers.0.final_layernorm.weight
+  -> model.layers.42.final_layernorm.weight</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="debug">
+        <h2>NaN 调试故事：不是训练炸了，是权重没进来</h2>
+        <p class="lead">
+          适配里最有价值的部分，是两次 NaN 的根因定位。它说明大模型框架迁移时，最危险的不是显式报错，而是“权重映射静默跳过”。
+        </p>
+
+        <div class="timeline">
+          <div class="event">
+            <span class="tag red">Problem 1</span>
+            <h3>Expert 权重未加载导致 NaN</h3>
+            <p>
+              现象：iteration 1 loss 为 NaN。Forward dump 显示 <code>experts.local_experts.0.linear_fc1</code> 输出首次出现 NaN，而输入正常。
+            </p>
+            <p>
+              根因：recipe 设置 <code>moe_grouped_gemm=False</code>，模型使用 SequentialMLP 命名 <code>local_experts.E.linear_fc1.weight</code>，但 bridge 只覆盖了 TEGroupedMLP 的 <code>linear_fc1.weight*</code> 格式，expert 权重被静默跳过。
+            </p>
+          </div>
+
+          <div class="event">
+            <span class="tag green">Fix 1</span>
+            <h3>补齐 SequentialMLP 专家映射</h3>
+            <pre><code>GatedMLPMapping(
+    megatron_param="decoder.layers.*.mlp.experts.local_experts.*.linear_fc1.weight",
+    gate="model.layers.*.mlp.experts.*.gate_proj.weight",
+    up="model.layers.*.mlp.experts.*.up_proj.weight",
+)
+
+AutoMapping(
+    megatron_param="decoder.layers.*.mlp.experts.local_experts.*.linear_fc2.weight",
+    hf_param="model.layers.*.mlp.experts.*.down_proj.weight",
+)</code></pre>
+          </div>
+
+          <div class="event">
+            <span class="tag red">Problem 2</span>
+            <h3>MLA Q LoRA 权重未加载导致 NaN</h3>
+            <p>
+              现象：修复 expert 映射后仍 NaN。权重检查发现 <code>linear_q_down_proj.weight</code> 在所有 rank 上为 NaN。
+            </p>
+            <p>
+              根因：Bailing V3 的 MLA 层使用 Q LoRA 压缩，Megatron 参数是 <code>linear_q_down_proj</code> 和 <code>linear_q_up_proj</code>，但 bridge 只映射了非 LoRA 路径的 <code>linear_q_proj</code>。
+            </p>
+          </div>
+
+          <div class="event">
+            <span class="tag green">Fix 2</span>
+            <h3>补齐 MLA Q LoRA 映射</h3>
+            <pre><code>"decoder.layers.*.self_attention.linear_q_down_proj.weight":
+    "model.layers.*.attention.q_a_proj.weight",
+
+"decoder.layers.*.self_attention.linear_q_up_proj.weight":
+    "model.layers.*.attention.q_b_proj.weight",
+
+"decoder.layers.*.self_attention.linear_q_up_proj.layer_norm_weight":
+    "model.layers.*.attention.q_a_layernorm.weight",</code></pre>
+          </div>
+        </div>
+
+        <h3>调试方法模板</h3>
+        <div class="cards">
+          <div class="card">
+            <span class="tag red">1</span>
+            <h3>权重 NaN 检查</h3>
+            <pre><code>for name, param in model.named_parameters():
+    has_nan = torch.isnan(param).any().item()
+    has_inf = torch.isinf(param).any().item()
+    if has_nan or has_inf:
+        print(f"[WEIGHT CORRUPTED] {name}")</code></pre>
+          </div>
+          <div class="card">
+            <span class="tag orange">2</span>
+            <h3>Forward dump</h3>
+            <p>在 MoE、attention、projection、norm 的入口和出口打印 shape、dtype、sum、mean、max、min，定位 NaN 首次出现的位置。</p>
+          </div>
+          <div class="card">
+            <span class="tag blue">3</span>
+            <h3>权重加载日志</h3>
+            <p>重点搜索 <code>No mapping found for megatron_param</code> 和 <code>Can't find X in hf_keys</code>，这些通常比 loss 更早暴露根因。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="checklist">
+        <h2>后续验证清单</h2>
+        <p class="lead">
+          适配工作已经覆盖主体路径，但文档里也列出了需要继续验证的边界问题。下面按风险从高到低整理。
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>事项</th>
+                <th>为什么重要</th>
+                <th>建议验证</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>MLA <code>g_proj</code> 门控</td>
+                <td>MCore MLA 当前不支持 <code>attention_output_gate</code>，可能抛 <code>NotImplementedError</code>。</td>
+                <td>决定是实现输出门控，还是暂时跳过 <code>g_proj</code> 权重。</td>
+              </tr>
+              <tr>
+                <td>KDA TP 分片</td>
+                <td>当前 KDA 使用简单 AutoMapping，结构匹配但仍要验证 tensor parallel 切分。</td>
+                <td>跑 bridge 转换 UT，比较 shard 后的参数形状和数值。</td>
+              </tr>
+              <tr>
+                <td>异构 layer spec</td>
+                <td>混合 MLA + KDA 不能只用普通 GPT decoder spec。</td>
+                <td>确认 provider 使用 <code>get_transformer_block_with_experimental_attention_variant_spec</code>。</td>
+              </tr>
+              <tr>
+                <td>MTP 层映射</td>
+                <td>Layer 42 使用 MLA + MoE，且有独立 eh/enorm/hnorm/final_layernorm。</td>
+                <td>检查 MTP 层参数加载完整性，并跑 forward。</td>
+              </tr>
+              <tr>
+                <td>真实权重 pretrain</td>
+                <td>mock data 只能验证路径，真实权重才能暴露数值和并行问题。</td>
+                <td>按远程路径加载 Flash checkpoint，运行短步数训练。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top: 22px;">
+          <strong>远程路径：</strong>
+          <br />Megatron-Bridge: <code>/mnt/sfs_turbo/wlp02367507/ling3/Megatron-Bridge/</code>
+          <br />Megatron-LM: <code>/mnt/sfs_turbo/wlp02367507/ling3/Megatron-LM/</code>
+          <br />模型权重: <code>/sfs_turbo/pretrained_models/bailing_v3/sft_ring_flash_v3_formal_0429_rc53_baseline_100w_safegate_tkv3_wthink_ep8cp8pp4_iter_0000651/</code>
+        </div>
+      </section>
+
+      <section id="glossary">
+        <h2>术语速查</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>术语</th>
+                <th>解释</th>
+                <th>在本文中的作用</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>KDA</td>
+                <td>Kimi Delta Attention，线性注意力变体。</td>
+                <td>Bailing V3 Flash 的主力 attention，5/6 层使用。</td>
+              </tr>
+              <tr>
+                <td>MLA</td>
+                <td>Multi-head Latent Attention，带 KV 低秩压缩的 softmax attention。</td>
+                <td>每 6 层插入 1 层，保留精确注意力能力。</td>
+              </tr>
+              <tr>
+                <td>MoE</td>
+                <td>Mixture of Experts，专家混合结构。</td>
+                <td>Flash 有 512 routed experts，每 token 激活 8 个。</td>
+              </tr>
+              <tr>
+                <td>MTP</td>
+                <td>Multi-token Prediction。</td>
+                <td>Flash 有 1 个 MTP layer，层索引 42。</td>
+              </tr>
+              <tr>
+                <td>SequentialMLP</td>
+                <td>非 grouped gemm 的专家实现，参数名含 <code>local_experts.N</code>。</td>
+                <td>第一次 NaN 的根因之一，原 bridge 未映射该命名。</td>
+              </tr>
+              <tr>
+                <td>Q LoRA</td>
+                <td>Q 投影低秩降维再升维。</td>
+                <td>第二次 NaN 的根因之一，LoRA 路径权重未加载。</td>
+              </tr>
+              <tr>
+                <td>EP / CP / PP</td>
+                <td>Expert Parallelism / Context Parallelism / Pipeline Parallelism。</td>
+                <td>Flash 路径名中出现 <code>ep8cp8pp4</code>，说明训练使用组合并行。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="footer-note">
+          生成依据：<code>bailing_v3_tiny_vs_flash.md</code> 与 <code>bailing_v3_megatron_bridge_adaptation.md</code>。本页面没有引入外部资料，所有数值和结论均来自这两个源文档。
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    document.querySelectorAll("[data-tabs]").forEach((tabs) => {
+      const buttons = Array.from(tabs.querySelectorAll("[data-tab]"));
+      const panels = Array.from(tabs.querySelectorAll(".tab-panel"));
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.getAttribute("data-tab");
+          buttons.forEach((item) => item.classList.toggle("active", item === button));
+          panels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
+        });
+      });
+    });
+  </script>
+</body>
+</html>
