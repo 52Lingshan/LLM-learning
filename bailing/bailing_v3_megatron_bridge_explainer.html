@@ -384,7 +384,10 @@
       margin-bottom: 12px;
     }
 
-    button {
+    button,
+    .tab-buttons label {
+      display: inline-flex;
+      align-items: center;
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 9px 12px;
@@ -393,16 +396,49 @@
       font: inherit;
       font-size: 14px;
       cursor: pointer;
+      user-select: none;
     }
 
-    button:hover, button.active {
+    button:hover,
+    button.active,
+    .tab-buttons label:hover {
       color: #fff;
       border-color: var(--blue);
       background: var(--blue);
     }
 
+    .tab-radio {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+
+    #tab-tiny-kda:checked ~ .tab-buttons label[for="tab-tiny-kda"],
+    #tab-flash-kda:checked ~ .tab-buttons label[for="tab-flash-kda"],
+    #tab-diff-kda:checked ~ .tab-buttons label[for="tab-diff-kda"],
+    #tab-mapping-mla:checked ~ .tab-buttons label[for="tab-mapping-mla"],
+    #tab-mapping-kda:checked ~ .tab-buttons label[for="tab-mapping-kda"],
+    #tab-mapping-moe:checked ~ .tab-buttons label[for="tab-mapping-moe"],
+    #tab-mapping-mtp:checked ~ .tab-buttons label[for="tab-mapping-mtp"] {
+      color: #fff;
+      border-color: var(--blue);
+      background: var(--blue);
+    }
+
+    #tab-tiny-kda:checked ~ .tab-panels #tiny-kda,
+    #tab-flash-kda:checked ~ .tab-panels #flash-kda,
+    #tab-diff-kda:checked ~ .tab-panels #diff-kda,
+    #tab-mapping-mla:checked ~ .tab-panels #mapping-mla,
+    #tab-mapping-kda:checked ~ .tab-panels #mapping-kda,
+    #tab-mapping-moe:checked ~ .tab-panels #mapping-moe,
+    #tab-mapping-mtp:checked ~ .tab-panels #mapping-mtp {
+      display: block;
+    }
 
     pre {
       overflow-x: auto;
@@ -775,14 +811,18 @@
           Tiny 与 Flash 建模代码只有 42 行差异，核心集中在 <code>BailingMoeV3KimiDeltaAttention</code>。最重要的变化是 gate 计算从 Python 侧外置，变成 CUDA kernel 内置融合。
         </p>
 
-        <div class="tabs" data-tabs>
+        <div class="tabs">
+          <input class="tab-radio" type="radio" name="kda-tabs" id="tab-tiny-kda" checked />
+          <input class="tab-radio" type="radio" name="kda-tabs" id="tab-flash-kda" />
+          <input class="tab-radio" type="radio" name="kda-tabs" id="tab-diff-kda" />
           <div class="tab-buttons">
-            <button class="active" data-tab="tiny-kda">Tiny 外置 gate</button>
-            <button data-tab="flash-kda">Flash 内置 gate</button>
-            <button data-tab="diff-kda">差异本质</button>
+            <label for="tab-tiny-kda">Tiny 外置 gate</label>
+            <label for="tab-flash-kda">Flash 内置 gate</label>
+            <label for="tab-diff-kda">差异本质</label>
           </div>
 
-          <div class="tab-panel active" id="tiny-kda">
+          <div class="tab-panels">
+          <div class="tab-panel" id="tiny-kda">
             <pre><code># Tiny 路径：先在外部计算 gate
 g = self.f_a_proj(hidden_states)
 g = fused_kda_gate(
@@ -851,6 +891,7 @@ o, recurrent_state = chunk_kda(
                 <span>kernel 内部完成 gate，减少 launch 和读写。</span>
               </div>
             </div>
+          </div>
           </div>
         </div>
 
@@ -979,15 +1020,20 @@ o, recurrent_state = chunk_kda(
           </table>
         </div>
 
-        <div class="tabs" data-tabs>
+        <div class="tabs">
+          <input class="tab-radio" type="radio" name="mapping-tabs" id="tab-mapping-mla" checked />
+          <input class="tab-radio" type="radio" name="mapping-tabs" id="tab-mapping-kda" />
+          <input class="tab-radio" type="radio" name="mapping-tabs" id="tab-mapping-moe" />
+          <input class="tab-radio" type="radio" name="mapping-tabs" id="tab-mapping-mtp" />
           <div class="tab-buttons">
-            <button class="active" data-tab="mapping-mla">MLA 映射</button>
-            <button data-tab="mapping-kda">KDA 映射</button>
-            <button data-tab="mapping-moe">MoE 映射</button>
-            <button data-tab="mapping-mtp">MTP 映射</button>
+            <label for="tab-mapping-mla">MLA 映射</label>
+            <label for="tab-mapping-kda">KDA 映射</label>
+            <label for="tab-mapping-moe">MoE 映射</label>
+            <label for="tab-mapping-mtp">MTP 映射</label>
           </div>
 
-          <div class="tab-panel active" id="mapping-mla">
+          <div class="tab-panels">
+          <div class="tab-panel" id="mapping-mla">
             <pre><code>decoder.layers.*.self_attention.linear_q_down_proj.weight
   -> model.layers.*.attention.q_a_proj.weight
 
@@ -1050,6 +1096,7 @@ mtp.layers.0.hnorm.weight
 
 mtp.layers.0.final_layernorm.weight
   -> model.layers.42.final_layernorm.weight</code></pre>
+          </div>
           </div>
         </div>
       </section>
@@ -1246,19 +1293,5 @@ AutoMapping(
       </section>
     </main>
   </div>
-
-  <script>
-    document.querySelectorAll("[data-tabs]").forEach((tabs) => {
-      const buttons = Array.from(tabs.querySelectorAll("[data-tab]"));
-      const panels = Array.from(tabs.querySelectorAll(".tab-panel"));
-      buttons.forEach((button) => {
-        button.addEventListener("click", () => {
-          const target = button.getAttribute("data-tab");
-          buttons.forEach((item) => item.classList.toggle("active", item === button));
-          panels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
-        });
-      });
-    });
-  </script>
 </body>
 </html>
